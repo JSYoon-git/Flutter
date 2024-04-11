@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:js_util';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,33 @@ class _HomeScreenState extends State<HomeScreen> {
   static final LatLng companyLatLng = LatLng(35.1687676, 126.9362036);
   static final CameraPosition initialPosition =
       CameraPosition(target: companyLatLng, zoom: 15);
+  static final double okDistance = 100;
+  static final Circle withInDistanceCircle = Circle(
+    circleId: CircleId('withInDistanceCircle'),
+    center: companyLatLng,
+    fillColor: Colors.blue.withOpacity(0.5),
+    radius: okDistance,
+    strokeColor: Colors.blue,
+    strokeWidth: 1,
+  );
+  static final Circle notWithInDistanceCircle = Circle(
+    circleId: CircleId('notWithInDistanceCircle'),
+    center: companyLatLng,
+    fillColor: Colors.red.withOpacity(0.5),
+    radius: okDistance,
+    strokeColor: Colors.red,
+    strokeWidth: 1,
+  );
+  static final Circle checkDoneCircle = Circle(
+    circleId: CircleId('checkDoneCircle'),
+    center: companyLatLng,
+    fillColor: Colors.green.withOpacity(0.5),
+    radius: okDistance,
+    strokeColor: Colors.green,
+    strokeWidth: 1,
+  );
+  static final Marker marker =
+      Marker(markerId: MarkerId('marekr'), position: companyLatLng);
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +61,37 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               if (snapshot.data == '위치 권한이 허가되었습니다.') {
-                return Column(
-                  children: [
-                    _CustomGoogleMap(initialPosition: initialPosition),
-                    _ChoolCheckButton(),
-                  ],
-                );
+                return StreamBuilder<Position>(
+                    stream: Geolocator.getPositionStream(),
+                    builder: (context, snapshot) {
+                      bool isWidthRange = false;
+
+                      if (snapshot.hasData) {
+                        final start = snapshot.data!;
+                        final end = companyLatLng;
+
+                        final distance = Geolocator.distanceBetween(
+                            start.latitude,
+                            start.longitude,
+                            end.latitude,
+                            end.longitude);
+                        if (distance < okDistance) {
+                          isWidthRange = true;
+                        }
+                      }
+                      return Column(
+                        children: [
+                          _CustomGoogleMap(
+                            initialPosition: initialPosition,
+                            withInDistanceCircle: isWidthRange
+                                ? withInDistanceCircle
+                                : notWithInDistanceCircle,
+                            marker: marker,
+                          ),
+                          _ChoolCheckButton(),
+                        ],
+                      );
+                    });
               } else {
                 return Center(child: Text(snapshot.data));
               }
@@ -82,7 +135,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _CustomGoogleMap extends StatelessWidget {
   final CameraPosition initialPosition;
-  const _CustomGoogleMap({required this.initialPosition, Key? key});
+  final Circle withInDistanceCircle;
+  final Marker marker;
+
+  const _CustomGoogleMap(
+      {required this.initialPosition,
+      required this.withInDistanceCircle,
+      required this.marker,
+      Key? key});
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +152,9 @@ class _CustomGoogleMap extends StatelessWidget {
         mapType: MapType.normal,
         initialCameraPosition: initialPosition,
         myLocationEnabled: true,
+        myLocationButtonEnabled: false,
+        circles: Set.from([withInDistanceCircle]),
+        markers: Set.from([marker]),
       ),
     );
   }
